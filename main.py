@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from src.core.config import LOG_LEVEL, CHECK_INTERVAL_SECONDS, AI_PROVIDER
+from src.core.config import LOG_LEVEL, CHECK_INTERVAL_SECONDS, AI_PROVIDER, BROWSER_HEADLESS
 from src.scrapers.excapper_scraper import ExcapperScraper
 from src.ai.ai_service import AIService
 from src.notifiers.telegram_notifier import TelegramNotifier
@@ -20,7 +20,7 @@ class KairosExcapperBot:
         self.notified_matches = set() # Store notified match IDs
 
     async def initialize(self):
-        self.scraper = await ExcapperScraper(headless=True).init_browser()
+        self.scraper = await ExcapperScraper(headless=BROWSER_HEADLESS).init_browser()
         login_res = await self.scraper.login()
         if not login_res.success:
             logging.error(f"Failed to login: {login_res.message}")

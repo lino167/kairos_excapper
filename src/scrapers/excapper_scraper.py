@@ -66,19 +66,37 @@ class ExcapperScraper:
 
     async def check_notifications(self):
         logging.info("Checking for new notifications...")
-        await self.page.goto(f"{self.url}#fav")
+        # Force navigation to the notification tab hash
+        if not self.page.url.endswith("#fav"):
+            await self.page.goto(f"{self.url}#fav")
+            await self.page.wait_for_timeout(2000)
+        
+        # Ensure the 'Notification' tab is actually active/clicked
+        # Sometimes goto #fav doesn't trigger the click handler if already on page
+        await self.page.click('a.tab[href="#fav"]')
         await self.page.wait_for_timeout(3000)
         
-        # Check for NO_NOTIFICATIONS_MESSAGE or empty table
+        # Verify if the empty message is visible
         content = await self.page.content()
         if NO_NOTIFICATIONS_MESSAGE in content:
-            logging.info("No active notifications found.")
+            logging.info("No active notifications found (matched empty message).")
             return []
 
-        # Find match rows
-        rows = await self.page.query_selector_all('tr[data-game-link]')
+        # Find match rows ONLY within the main table container to avoid sidebar/other rows
+        # Based on subagent, the container is often #premach but let's be even more specific if possible
+        # We look for tr[data-game-link] which is the standard for match rows on this site
+        rows = await self.page.query_selector_all('#premach tr[data-game-link]')
+        
+        # If no rows found with data-game-link, it's definitely empty
+        if not rows:
+            logging.info("No match rows found in the table.")
+            return []
+
         matches = []
         for row in rows:
+            # Skip hidden rows if any
+            if not await row.is_visible():
+                continue
             game_link = await row.get_attribute('data-game-link')
             cols = await row.query_selector_all('td')
             if not game_link or len(cols) < 3:
