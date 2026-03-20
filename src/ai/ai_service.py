@@ -9,7 +9,7 @@ class AIService:
         self.provider = provider
         if provider == "gemini" and GEMINI_API_KEY:
             genai.configure(api_key=GEMINI_API_KEY)
-            self.model = genai.GenerativeModel('gemini-1.5-pro')
+            self.model = genai.GenerativeModel('gemini-1.5-flash')
         elif provider == "openai" and OPENAI_API_KEY:
             self.client = OpenAI(api_key=OPENAI_API_KEY)
         else:
@@ -24,18 +24,18 @@ class AIService:
                 data_text += " | ".join(row) + "\n"
                 
         prompt = f"""
-        Analyze the following betting data for a football match:
-        Teams: {match_notification.home_team} vs {match_notification.away_team}
-        Market (Notified): {match_notification.notified_market}
-        Extracted Match Data:
+        Analise os seguintes dados de apostas para uma partida de futebol:
+        Times: {match_notification.home_team} vs {match_notification.away_team}
+        Mercado Notificado: {match_notification.notified_market}
+        Dados Extraídos da Partida:
         {data_text}
         
-        Provide a concise analysis focusing on:
-        1.  Are there any significant market discrepancies or smart money movements?
-        2.  Is the notified market a good betting opportunity?
-        3.  What is the recommended betting strategy for this match?
+        Forneça uma análise concisa e técnica focando em:
+        1.  Existem discrepâncias significativas no mercado ou movimentos de "Smart Money"?
+        2.  O mercado notificado é uma boa oportunidade de aposta?
+        3.  Qual é a estratégia de aposta recomendada para esta partida?
         
-        Be specific and clinical in your analysis. Use technical betting terms if necessary.
+        Seja específico e clínico em sua análise. Use termos técnicos de apostas se necessário.
         """
         return prompt
 

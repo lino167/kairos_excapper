@@ -25,19 +25,20 @@ class ExcapperScraper:
 
     async def login(self):
         logging.info("Attempting to login to Excapper...")
-        await self.page.goto(self.url)
-        
-        # Check if already logged in by looking for Notification tab message
-        await self.page.click('a.tab[href="#fav"]')
-        await self.page.wait_for_timeout(2000) # Give it a moment to load the table content
-        
-        content = await self.page.content()
-        if AUTH_REQUIRED_MESSAGE not in content:
-            logging.info("Already logged in or login message not found.")
-            return ExcapperLoginResult(success=True, message="Already logged in")
-
-        # Click Sign in button
         try:
+            await self.page.goto(self.url)
+            await self.page.wait_for_load_state("networkidle")
+            
+            # Check if already logged in
+            await self.page.click('a.tab[href="#fav"]')
+            await self.page.wait_for_timeout(3000)
+            
+            content = await self.page.content()
+            if AUTH_REQUIRED_MESSAGE not in content:
+                logging.info("Already logged in or login message not found.")
+                return ExcapperLoginResult(success=True, message="Already logged in")
+
+            # Click Sign in button
             await self.page.click('text="Sign in"')
             await self.page.wait_for_selector('input[name="email"]', timeout=5000)
             
@@ -47,11 +48,14 @@ class ExcapperScraper:
                 
             # Submit
             await self.page.click('input[type="submit"][value="Authorization"]')
-            await self.page.wait_for_load_state("networkidle")
+            
+            # Wait for redirection and stabilizing
+            await self.page.wait_for_load_state("load")
+            await self.page.wait_for_timeout(5000)
             
             # Verify login by checking Notification tab again
             await self.page.click('a.tab[href="#fav"]')
-            await self.page.wait_for_timeout(2000)
+            await self.page.wait_for_timeout(3000)
             
             post_login_content = await self.page.content()
             if AUTH_REQUIRED_MESSAGE in post_login_content:
@@ -71,44 +75,39 @@ class ExcapperScraper:
             await self.page.goto(f"{self.url}#fav")
             await self.page.wait_for_timeout(2000)
         
-        # Ensure the 'Notification' tab is actually active/clicked
-        # Sometimes goto #fav doesn't trigger the click handler if already on page
+        # Ensure the 'Notification' tab is active
         await self.page.click('a.tab[href="#fav"]')
         await self.page.wait_for_timeout(3000)
         
-        # Verify if the empty message is visible
-        content = await self.page.content()
-        if NO_NOTIFICATIONS_MESSAGE in content:
-            logging.info("No active notifications found (matched empty message).")
-            return []
-
-        # Find match rows ONLY within the main table container to avoid sidebar/other rows
-        # Based on subagent, the container is often #premach but let's be even more specific if possible
-        # We look for tr[data-game-link] which is the standard for match rows on this site
-        rows = await self.page.query_selector_all('#premach tr[data-game-link]')
+        # Find match rows. In the #fav tab, data-game-link is on the <td>, not the <tr>.
+        # We find all <tr> that contain a <td> with data-game-link.
+        rows = await self.page.query_selector_all('#fav tr:has(td[data-game-link])')
         
-        # If no rows found with data-game-link, it's definitely empty
         if not rows:
-            logging.info("No match rows found in the table.")
+            logging.info("No notification rows found in the #fav table.")
             return []
 
         matches = []
         for row in rows:
-            # Skip hidden rows if any
+            # Skip hidden rows
             if not await row.is_visible():
                 continue
-            game_link = await row.get_attribute('data-game-link')
+                
             cols = await row.query_selector_all('td')
-            if not game_link or len(cols) < 3:
+            if len(cols) < 5:
+                continue
+            
+            # Extract link from the FIRST cell that has it
+            target_cell = await row.query_selector('td[data-game-link]')
+            if not target_cell:
                 continue
                 
-            # Column indices: 0: Date, 1: Setting (Market), 2: Country, 3: League, 4: Teams
+            game_link = await target_cell.get_attribute('data-game-link')
             cols_text = [await col.inner_text() for col in cols]
-            if len(cols_text) < 5:
-                continue
-                
-            market_notified = cols_text[1].strip()
-            home_away = cols_text[4].strip()
+            
+            # Expected Columns: 0: Date, 1: Setting, 2: Flag, 3: League, 4: Teams, 5: Market
+            market_notified = cols_text[1].strip() if len(cols_text) > 1 else "Unknown"
+            home_away = cols_text[4].strip() if len(cols_text) > 4 else "Unknown"
             
             teams = home_away.split(' - ')
             home_team = teams[0].strip() if len(teams) > 0 else "Unknown"
@@ -118,11 +117,11 @@ class ExcapperScraper:
                 id=game_link.split('=')[-1],
                 home_team=home_team,
                 away_team=away_team,
-                excapper_link=f"{self.url}{game_link}",
+                excapper_link=f"{self.url}{game_link}" if not game_link.startswith('http') else game_link,
                 notified_market=market_notified
             ))
             
-        logging.info(f"Found {len(matches)} notifications.")
+        logging.info(f"Found {len(matches)} active notifications.")
         return matches
 
     async def extract_match_details(self, match_notification: MatchNotification):
@@ -153,5 +152,12 @@ class ExcapperScraper:
         return match_notification
 
     async def close(self):
-        if self.browser:
-            await self.browser.close()
+        try:
+            if self.page:
+                await self.page.close()
+            if self.context:
+                await self.context.close()
+            if self.browser:
+                await self.browser.close()
+        except:
+            pass
