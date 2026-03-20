@@ -1,4 +1,5 @@
 import logging
+import html
 from telegram import Bot
 from src.core.config import TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
 from src.models.match import MatchNotification
@@ -13,25 +14,34 @@ class TelegramNotifier:
             logging.warning("Telegram Bot Token or Chat ID not configured.")
             return
 
+        # Escape the AI analysis to avoid breaking HTML tags
+        analysis_escaped = html.escape(match_notification.ai_analysis)
+
         message = f"""
-🚨 *NEW NOTIFICATION FOUND!* 🚨
-⚽ *Match:* `{match_notification.home_team} vs {match_notification.away_team}`
-📊 *Market:* `{match_notification.notified_market}`
+<b>🚨 NOVA NOTIFICAÇÃO ENCONTRADA! 🚨</b>
 
-🧠 *AI Analysis Insights:*
-{match_notification.ai_analysis}
+⚽ <b>Partida:</b> {match_notification.home_team} vs {match_notification.away_team}
+📊 <b>Mercado:</b> {match_notification.notified_market}
 
-🔗 *Links:*
-[Excapper Match Page]({match_notification.excapper_link})
-[Betfair Market]({match_notification.betfair_link if match_notification.betfair_link else "N/A"})
+🧠 <b>Insights da IA:</b>
+{analysis_escaped}
+
+🔗 <b>Links:</b>
+<a href="{match_notification.excapper_link}">Página no Excapper</a>
+<a href="{match_notification.betfair_link if match_notification.betfair_link else '#'}">Mercado Betfair</a>
         """
         
+        # Telegram has a 4096 character limit. Truncate if necessary (safe limit 4000)
+        if len(message) > 4090:
+            message = message[:4000] + "\n\n<i>... [Texto truncado por limite de caracteres]</i>"
+
         try:
             logging.info(f"Sending Telegram alert for Match: {match_notification.home_team}")
             await self.bot.send_message(
                 chat_id=self.chat_id, 
                 text=message, 
-                parse_mode='Markdown'
+                parse_mode='HTML',
+                disable_web_page_preview=True
             )
         except Exception as e:
             logging.error(f"Failed to send Telegram message: {e}")

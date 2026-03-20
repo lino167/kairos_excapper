@@ -9,7 +9,15 @@ class AIService:
         self.provider = provider
         if provider == "gemini" and GEMINI_API_KEY:
             genai.configure(api_key=GEMINI_API_KEY)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            # Relax safety settings for betting analysis
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+            generation_config = genai.types.GenerationConfig(max_output_tokens=1500)
+            self.model = genai.GenerativeModel('gemini-2.5-flash', safety_settings=safety_settings, generation_config=generation_config)
         elif provider == "openai" and OPENAI_API_KEY:
             self.client = OpenAI(api_key=OPENAI_API_KEY)
         else:
@@ -45,9 +53,14 @@ class AIService:
         
         try:
             if self.provider == "gemini" and GEMINI_API_KEY:
-                # Synchronous call for now, could be wrapped in executor
                 response = self.model.generate_content(prompt)
-                match_notification.ai_analysis = response.text
+                
+                # Check if the response contains valid text to avoid 
+                # "quick accessor requires valid Part" error
+                if response.candidates and any(c.content.parts for c in response.candidates):
+                    match_notification.ai_analysis = response.text
+                else:
+                    match_notification.ai_analysis = "A análise da IA foi bloqueada ou não retornou dados (possivelmente por política de conteúdo). Verifique os dados da partida."
             elif self.provider == "openai" and OPENAI_API_KEY:
                 response = self.client.chat.completions.create(
                     model="gpt-4-turbo-preview",
