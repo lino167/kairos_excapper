@@ -1,0 +1,10 @@
+playwright
+playwright-stealth
+python-dotenv
+pydantic
+openai
+google-generative-ai
+python-telegram-bot
+beautifulsoup4
+requests
+pandas
