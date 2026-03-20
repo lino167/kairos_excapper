@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from playwright.async_api import async_playwright
-from playwright_stealth.stealth import stealth_async
+from playwright_stealth import Stealth
 from src.core.config import EXCAPPER_USER, EXCAPPER_PASS, AUTH_REQUIRED_MESSAGE, NO_NOTIFICATIONS_MESSAGE
 from src.models.match import MatchNotification, ExcapperLoginResult
 
@@ -20,7 +20,7 @@ class ExcapperScraper:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         self.page = await self.context.new_page()
-        await stealth_async(self.page)
+        await Stealth().apply_stealth_async(self.page)
         return self
 
     async def login(self):
@@ -39,16 +39,14 @@ class ExcapperScraper:
         # Click Sign in button
         try:
             await self.page.click('text="Sign in"')
-            await self.page.wait_for_selector('input.lightform', timeout=5000)
+            await self.page.wait_for_selector('input[name="email"]', timeout=5000)
             
             # Fill credentials
-            inputs = await self.page.query_selector_all('input.lightform')
-            if len(inputs) >= 2:
-                await inputs[0].fill(EXCAPPER_USER)
-                await inputs[1].fill(EXCAPPER_PASS)
+            await self.page.fill('input[name="email"]', EXCAPPER_USER)
+            await self.page.fill('input[name="psw"]', EXCAPPER_PASS)
                 
             # Submit
-            await self.page.click('input.btn.btn-orange[value="Authorization"]')
+            await self.page.click('input[type="submit"][value="Authorization"]')
             await self.page.wait_for_load_state("networkidle")
             
             # Verify login by checking Notification tab again
@@ -68,8 +66,8 @@ class ExcapperScraper:
 
     async def check_notifications(self):
         logging.info("Checking for new notifications...")
-        await self.page.click('a.tab[href="#fav"]')
-        await self.page.wait_for_timeout(2000)
+        await self.page.goto(f"{self.url}#fav")
+        await self.page.wait_for_timeout(3000)
         
         # Check for NO_NOTIFICATIONS_MESSAGE or empty table
         content = await self.page.content()
@@ -86,10 +84,13 @@ class ExcapperScraper:
             if not game_link or len(cols) < 3:
                 continue
                 
-            # Basic info extraction from row (names, time, market)
-            # You might need to refine the indexing based on the site structure
-            home_away = await cols[1].inner_text()
-            market_notified = await cols[2].inner_text() # Adjust column index
+            # Column indices: 0: Date, 1: Setting (Market), 2: Country, 3: League, 4: Teams
+            cols_text = [await col.inner_text() for col in cols]
+            if len(cols_text) < 5:
+                continue
+                
+            market_notified = cols_text[1].strip()
+            home_away = cols_text[4].strip()
             
             teams = home_away.split(' - ')
             home_team = teams[0].strip() if len(teams) > 0 else "Unknown"

@@ -1,5 +1,5 @@
 import logging
-import google.generative_ai as genai
+import google.generativeai as genai
 from openai import OpenAI
 from src.core.config import GEMINI_API_KEY, OPENAI_API_KEY
 from src.models.match import MatchNotification

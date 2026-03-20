@@ -3,7 +3,7 @@ playwright-stealth
 python-dotenv
 pydantic
 openai
-google-generative-ai
+google-generativeai
 python-telegram-bot
 beautifulsoup4
 requests
