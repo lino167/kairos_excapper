@@ -41,11 +41,15 @@ class KairosExcapperBot:
                         logging.info(f"Skipping already notified match: {match_notif.home_team}")
                         continue
                         
-                    # 1. Extract Details
+                    # 1. Extract Details (now includes cleaning)
                     detailed_notif = await self.scraper.extract_match_details(match_notif)
                     logging.info(f"Extracted details for {match_notif.home_team}")
                     
-                    # 2. AI Analysis
+                    # 2. Performance Calculations (Place for your logic)
+                    # Example: print(detailed_notif.cleaned_data['table_0'][0]['Volume'])
+                    logging.info(f"Ready for calculations on {len(detailed_notif.cleaned_data)} tables.")
+                    
+                    # 3. AI Analysis
                     detailed_notif = await self.ai.analyze_match(detailed_notif)
                     logging.info("AI Analysis completed.")
                     
@@ -67,8 +71,13 @@ class KairosExcapperBot:
 
 if __name__ == "__main__":
     bot = KairosExcapperBot()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        asyncio.run(bot.run())
+        loop.run_until_complete(bot.run())
     except KeyboardInterrupt:
         logging.info("System shutting down...")
-        asyncio.run(bot.close())
+    finally:
+        # Gracefully close background tasks and browser
+        loop.run_until_complete(bot.close())
+        loop.close()

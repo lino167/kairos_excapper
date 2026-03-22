@@ -4,6 +4,7 @@ from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from src.core.config import EXCAPPER_USER, EXCAPPER_PASS, AUTH_REQUIRED_MESSAGE, NO_NOTIFICATIONS_MESSAGE
 from src.models.match import MatchNotification, ExcapperLoginResult
+from src.core.data_transformer import DataTransformer
 
 class ExcapperScraper:
     def __init__(self, headless=True):
@@ -153,6 +154,10 @@ class ExcapperScraper:
                 tables_data[f"table_{idx}"] = table_rows[:50]
                 
         match_notification.match_data = tables_data
+        
+        # Populate cleaned data using the DataTransformer
+        match_notification.cleaned_data = DataTransformer.process_match_notification(tables_data)
+        
         return match_notification
 
     async def close(self):

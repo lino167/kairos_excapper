@@ -26,22 +26,55 @@ class AIService:
     def generate_analysis_prompt(self, match_notification: MatchNotification):
         """Build the prompt for match analysis."""
         data_text = ""
-        for table_id, row_data in match_notification.match_data.items():
-            data_text += f"\nTable: {table_id}\n"
-            for row in row_data:
-                data_text += " | ".join(row) + "\n"
+        
+        # Use cleaned_data for a more structured prompt if available
+        if match_notification.cleaned_data:
+            for table_id, rows in match_notification.cleaned_data.items():
+                data_text += f"\nTabela: {table_id}\n"
+                for row in rows:
+                    # Convert dict to a clean string format
+                    row_str = ", ".join([f"{k}: {v}" for k, v in row.items()])
+                    data_text += f"- {row_str}\n"
+        else:
+            # Fallback to raw match_data
+            for table_id, row_data in match_notification.match_data.items():
+                data_text += f"\nTabela: {table_id}\n"
+                for row in row_data:
+                    data_text += " | ".join(row) + "\n"
                 
         prompt = f"""
-        Analise os seguintes dados de apostas para uma partida de futebol:
+        Você é um analista especialista em mercados de apostas esportivas e Smart Money.
+        Analise os dados extraídos do Excapper para a seguinte partida:
+        
         Times: {match_notification.home_team} vs {match_notification.away_team}
-        Mercado Notificado: {match_notification.notified_market}
-        Dados Extraídos da Partida:
+        Mercado: {match_notification.notified_market}
+        
+        ### Guia de Colunas do Excapper:
+        - Summ: Volume total de dinheiro correspondido nesta seleção (liquidez).
+        - Change: Variação de volume recente. Ex: "27 / 1.21" significa que entraram 27€ (1.21% do total da seleção).
+        - Odds: Cotação atual.
+        - All: Volume total de dinheiro em TODO o mercado (todas as seleções somadas).
+        - Percent money on market: Quanto do dinheiro total do mercado está nesta seleção.
+        - Score: Placar no momento da atualização.
+        - Time: Minuto do jogo.
+        
+        ### Dados da Partida:
         {data_text}
         
-        Forneça uma análise concisa e técnica focando em:
-        1.  Existem discrepâncias significativas no mercado ou movimentos de "Smart Money"?
-        2.  O mercado notificado é uma boa oportunidade de aposta?
-        3.  Qual é a estratégia de aposta recomendada para esta partida?
+        ### Sua Tarefa:
+        Forneça uma análise concisa e técnica:
+        1. Identifique anomalias: Há entradas bruscas de volume em relação ao total (Smart Money)?
+        2. Pressão do Mercado: O volume nesta seleção é dominante (comparar Summ vs All)? 
+        3. Relação Score/Odds: O preço (Odd) está justo para o placar e tempo de jogo?
+        
+        ### Conclusão Obrigatória (Sugestão de Aposta):
+        Ao final da sua análise, você DEVE fornecer um bloco estruturado exatamente assim:
+        
+        <b>SUGESTÃO:</b> [Back/Lay/Não Apostar] na seleção [Nome da Seleção]
+        <b>MERCADO:</b> [Nome do Mercado]
+        <b>ODD MÍNIMA:</b> [Cotação sugerida]
+        <b>CONFIANÇA:</b> [1 a 10]
+        <b>RESUMO:</b> [Uma frase curta justificando a entrada]
         
         IMPORTANTE: NÃO use markdown (nada de asteriscos). 
         Se você precisar destacar algo em negrito, use EXCLUSIVAMENTE a tag HTML: <b>texto desejado</b>.

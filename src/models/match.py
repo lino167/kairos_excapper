@@ -1,10 +1,10 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 
 class BettingMarket(BaseModel):
     name: str
     betfair_link: Optional[str] = None
-    data: Dict[str, str or float] = {}
+    data: Dict[str, Union[str, float]] = {}
 
 class MatchNotification(BaseModel):
     id: str
@@ -13,7 +13,8 @@ class MatchNotification(BaseModel):
     excapper_link: str
     betfair_link: Optional[str] = None
     notified_market: Optional[str] = None
-    match_data: Optional[Dict[str, List[Dict[str, str]]]] = {} # Extracted tables data
+    match_data: Optional[Dict[str, List[List[str]]]] = {} # Raw extracted tables (List of Lists)
+    cleaned_data: Optional[Dict[str, List[Dict[str, Union[float, str]]]]] = {} # Numeric/Calculable data (List of Dicts)
     ai_analysis: Optional[str] = None
 
 class ExcapperLoginResult(BaseModel):
