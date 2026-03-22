@@ -134,7 +134,7 @@ class ExcapperScraper:
         if betfair_btn:
             match_notification.betfair_link = await betfair_btn.get_attribute('href')
             
-        # Extract all tables
+        # Extract all relevant tables
         tables_data = {}
         tables = await self.page.query_selector_all('table')
         for idx, table in enumerate(tables):
@@ -143,10 +143,14 @@ class ExcapperScraper:
             for row in rows:
                 cols = await row.query_selector_all('td, th')
                 row_data = [await col.inner_text() for col in cols]
-                if row_data:
+                # Filter out empty or mostly empty rows
+                if any(cell.strip() for cell in row_data):
                     table_rows.append(row_data)
-            if table_rows:
-                tables_data[f"table_{idx}"] = table_rows
+                    
+            # Only include tables that seem to have data (more than 1 row/column)
+            if len(table_rows) > 1 and len(table_rows[0]) > 1:
+                # Limit total rows per table to avoid hitting token limits
+                tables_data[f"table_{idx}"] = table_rows[:50]
                 
         match_notification.match_data = tables_data
         return match_notification

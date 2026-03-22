@@ -14,8 +14,9 @@ class TelegramNotifier:
             logging.warning("Telegram Bot Token or Chat ID not configured.")
             return
 
-        # Escape the AI analysis to avoid breaking HTML tags
+        # Escape the AI analysis to avoid breaking HTML tags, but then allow <b> specifically
         analysis_escaped = html.escape(match_notification.ai_analysis)
+        analysis_escaped = analysis_escaped.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
 
         message = f"""
 <b>🚨 NOVA NOTIFICAÇÃO ENCONTRADA! 🚨</b>

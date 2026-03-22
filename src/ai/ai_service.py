@@ -16,8 +16,8 @@ class AIService:
                 {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
             ]
-            generation_config = genai.types.GenerationConfig(max_output_tokens=1500)
-            self.model = genai.GenerativeModel('gemini-2.5-flash', safety_settings=safety_settings, generation_config=generation_config)
+            # Use a more stable and powerful model (pro-latest)
+            self.model = genai.GenerativeModel('gemini-pro-latest', safety_settings=safety_settings)
         elif provider == "openai" and OPENAI_API_KEY:
             self.client = OpenAI(api_key=OPENAI_API_KEY)
         else:
@@ -43,7 +43,8 @@ class AIService:
         2.  O mercado notificado é uma boa oportunidade de aposta?
         3.  Qual é a estratégia de aposta recomendada para esta partida?
         
-        Seja específico e clínico em sua análise. Use termos técnicos de apostas se necessário.
+        IMPORTANTE: NÃO use markdown (nada de asteriscos). 
+        Se você precisar destacar algo em negrito, use EXCLUSIVAMENTE a tag HTML: <b>texto desejado</b>.
         """
         return prompt
 
