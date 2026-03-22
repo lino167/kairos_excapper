@@ -19,17 +19,16 @@ class TelegramNotifier:
         analysis_escaped = analysis_escaped.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
 
         message = f"""
-<b>🚨 NOVA NOTIFICAÇÃO ENCONTRADA! 🚨</b>
+⚡ <b>KAIROS PRO BOT - NOVO SINAL!</b> ⚡
 
-⚽ <b>Partida:</b> {match_notification.home_team} vs {match_notification.away_team}
-📊 <b>Mercado:</b> {match_notification.notified_market}
+⚽ <b>{match_notification.home_team}</b> vs <b>{match_notification.away_team}</b>
+📈 <b>Detector:</b> {match_notification.notified_market}
 
-🧠 <b>Insights da IA:</b>
 {analysis_escaped}
 
-🔗 <b>Links:</b>
-<a href="{match_notification.excapper_link}">Página no Excapper</a>
-<a href="{match_notification.betfair_link if match_notification.betfair_link else '#'}">Mercado Betfair</a>
+🔗 <b>LINKS RÁPIDOS:</b>
+<a href="{match_notification.excapper_link}">📊 Página de Dados</a>
+<a href="{match_notification.betfair_link if match_notification.betfair_link else '#'}">💰 Mercado Betfair</a>
         """
         
         # Telegram has a 4096 character limit. Truncate if necessary (safe limit 4000)

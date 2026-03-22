@@ -51,30 +51,39 @@ class AIService:
         
         ### Guia de Colunas do Excapper:
         - Summ: Volume total de dinheiro correspondido nesta seleção (liquidez).
-        - Change: Variação de volume recente. Ex: "27 / 1.21" significa que entraram 27€ (1.21% do total da seleção).
+        - Change: Variação de volume recente. Ex: "2000 / 13%" significa que entraram 2000€ (13% da seleção).
         - Odds: Cotação atual.
-        - All: Volume total de dinheiro em TODO o mercado (todas as seleções somadas).
-        - Percent money on market: Quanto do dinheiro total do mercado está nesta seleção.
-        - Score: Placar no momento da atualização.
+        - All: Volume total no mercado inteiro.
+        - Score: Placar no momento da atualização (Ex: 1-0).
         - Time: Minuto do jogo.
+        
+        ### Raciocínio Estratégico Exigido (Placar x Tempo):
+        A IA deve correlacionar esses dados usando os seguintes padrões vencedores:
+        1. **Late Drama (80'+)**: Entradas massivas de Change % (>10%) no final de jogos empatados ou com 1 gol de vantagem são sinais CRÍTICOS de um gol tardio.
+        2. **Goleada/Pressão Contínua (20'-60')**: Entradas acima de 500€ em Over quando o favorito já vence por 2-0 antecipam goleadas (próximo gol).
+        3. **Recuperação (Underdog/Empate)**: Se o favorito está empatando e o Change % dispara no 2º tempo, o mercado está prevendo o gol da vitória.
+        4. **Cálculo de Valor**: Se o tempo restante é curto (<10 min) e a Odd está abaixo de 1.40, avalie se o risco compensa mesmo com Smart Money.
         
         ### Dados da Partida:
         {data_text}
         
-        ### Sua Tarefa:
-        Forneça uma análise concisa e técnica:
-        1. Identifique anomalias: Há entradas bruscas de volume em relação ao total (Smart Money)?
-        2. Pressão do Mercado: O volume nesta seleção é dominante (comparar Summ vs All)? 
-        3. Relação Score/Odds: O preço (Odd) está justo para o placar e tempo de jogo?
+        ### Sua Tarefa (Linguagem de Tipster Profissional):
+        Assuma a postura de um Tipster Especialista em Live. Sua análise deve ser direta, vibrante e usar a linguagem dos apostadores (sem ser puramente técnica).
+        1. Identifique o Movimento: Houve "Dinheiro Profissional" (Smart Money) entrando agora?
+        2. Pressão em Campo: O volume injetado justifica o risco pelo tempo que falta? 
+        3. Oportunidade de Green: O cenário é favorável para um gol ou manutenção do placar?
         
-        ### Conclusão Obrigatória (Sugestão de Aposta):
-        Ao final da sua análise, você DEVE fornecer um bloco estruturado exatamente assim:
+        ### 🚨 FORMATO DO SINAL (Obrigatório):
+        Sua resposta FINAL deve ser curta e impactante, seguindo este modelo exato:
         
-        <b>SUGESTÃO:</b> [Back/Lay/Não Apostar] na seleção [Nome da Seleção]
-        <b>MERCADO:</b> [Nome do Mercado]
-        <b>ODD MÍNIMA:</b> [Cotação sugerida]
-        <b>CONFIANÇA:</b> [1 a 10]
-        <b>RESUMO:</b> [Uma frase curta justificando a entrada]
+        <b>📊 ANALISE DO ESPECIALISTA:</b>
+        [Um parágrafo curto e direto sobre o que o mercado está fazendo agora, usando termos como "derretimento de odd", "pressão no over", "volume dominante"]
+        
+        <b>🔥 INDICAÇÃO:</b> [Back/Lay/Over] [Seleção]
+        <b>⚽ MERCADO:</b> [Nome do Mercado]
+        <b>💰 ODD MÍNIMA:</b> [Cotação sugerida]
+        <b>⭐ CONFIANÇA:</b> [1 a 10]
+        <b>📝 RESUMO:</b> [Uma frase "matadora" justificando o sinal]
         
         IMPORTANTE: NÃO use markdown (nada de asteriscos). 
         Se você precisar destacar algo em negrito, use EXCLUSIVAMENTE a tag HTML: <b>texto desejado</b>.
