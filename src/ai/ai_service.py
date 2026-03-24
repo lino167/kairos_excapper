@@ -36,18 +36,22 @@ class AIService:
                     row_str = ", ".join([f"{k}: {v}" for k, v in row.items()])
                     data_text += f"- {row_str}\n"
         else:
-            # Fallback to raw match_data
+            # Fallback para match_data bruto do Excapper
             for table_id, row_data in match_notification.match_data.items():
                 data_text += f"\nTabela: {table_id}\n"
                 for row in row_data:
                     data_text += " | ".join(row) + "\n"
                 
+        # Incluir tabelas específicas do Dropping-Odds se disponíveis
+        if match_notification.raw_data:
+            data_text += f"\n### DADOS ADICIONAIS DO MONITOR DE DROPS (Dropping-Odds):\n{match_notification.raw_data}\n"
+            
         prompt = f"""
         Você é um analista especialista em mercados de apostas esportivas e Smart Money.
-        Analise os dados extraídos do Excapper para a seguinte partida:
+        Analise os dados extraídos do Excapper e do Dropping-Odds para a seguinte partida:
         
         Times: {match_notification.home_team} vs {match_notification.away_team}
-        Mercado: {match_notification.notified_market}
+        Alerta Original: {match_notification.notified_market}
         
         ### Guia de Colunas do Excapper:
         - Summ: Volume total de dinheiro correspondido nesta seleção (liquidez).
@@ -57,12 +61,11 @@ class AIService:
         - Score: Placar no momento da atualização (Ex: 1-0).
         - Time: Minuto do jogo.
         
-        ### Raciocínio Estratégico Exigido (Placar x Tempo):
-        A IA deve correlacionar esses dados usando os seguintes padrões vencedores:
-        1. **Late Drama (80'+)**: Entradas massivas de Change % (>10%) no final de jogos empatados ou com 1 gol de vantagem são sinais CRÍTICOS de um gol tardio.
-        2. **Goleada/Pressão Contínua (20'-60')**: Entradas acima de 500€ em Over quando o favorito já vence por 2-0 antecipam goleadas (próximo gol).
-        3. **Recuperação (Underdog/Empate)**: Se o favorito está empatando e o Change % dispara no 2º tempo, o mercado está prevendo o gol da vitória.
-        4. **Cálculo de Valor**: Se o tempo restante é curto (<10 min) e a Odd está abaixo de 1.40, avalie se o risco compensa mesmo com Smart Money.
+        ### Raciocínio Estratégico Exigido (Placar x Tempo x Drop):
+        A IA deve correlacionar esses dados usando os seguintes padrões:
+        1. **Correlação de Fontes**: Se o Dropping-Odds mostra uma queda brusca (drop) e o Excapper confirma a entrada de volume alto (Change %), o sinal é EXTREMAMENTE forte.
+        2. **Divergência**: Se há um drop mas o volume no Excapper está baixo, pode ser apenas ajuste de mercado ou falta de liquidez.
+        3. **Late Drama (80'+)**: Entradas massivas no final de jogos empatados com drop associado são sinais CRÍTICOS.
         
         ### Dados da Partida:
         {data_text}
