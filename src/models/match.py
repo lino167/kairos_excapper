@@ -15,6 +15,7 @@ class MatchNotification(BaseModel):
     notified_market: Optional[str] = None
     match_data: Optional[Dict[str, List[List[str]]]] = {} # Raw extracted tables (List of Lists)
     cleaned_data: Optional[Dict[str, List[Dict[str, Union[float, str]]]]] = {} # Numeric/Calculable data (List of Dicts)
+    market_links: Optional[Dict[str, str]] = {} # Market Name -> Betfair Link
     ai_analysis: Optional[str] = None
     raw_data: Optional[str] = None # Dados brutos textuais extras (ex: Dropping-Odds)
 

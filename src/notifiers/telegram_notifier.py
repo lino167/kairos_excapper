@@ -1,5 +1,6 @@
 import logging
 import html
+import re
 from telegram import Bot
 from src.core.config import TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
 from src.models.match import MatchNotification
@@ -17,6 +18,19 @@ class TelegramNotifier:
         # Escape the AI analysis to avoid breaking HTML tags, but then allow <b> specifically
         analysis_escaped = html.escape(match_notification.ai_analysis)
         analysis_escaped = analysis_escaped.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
+        # Select the correct Betfair link based on the market indicated by the AI
+        final_betfair_link = match_notification.betfair_link
+        if match_notification.market_links and match_notification.ai_analysis:
+            # Look for the market name in the AI analysis (e.g. after "MERCADO:")
+            m = re.search(r'MERCADO:</b>\s*(.*?)\n', analysis_escaped, re.IGNORECASE)
+            if m:
+                suggested_market = m.group(1).strip()
+                # Try to find a exact or fuzzy match in our extracted links
+                for market_name, link in match_notification.market_links.items():
+                    if suggested_market.lower() in market_name.lower() or market_name.lower() in suggested_market.lower():
+                        final_betfair_link = link
+                        logging.info(f"Using specific Betfair link for market: {market_name}")
+                        break
 
         message = f"""
 ⚡ <b>KAIROS PRO BOT - NOVO SINAL!</b> ⚡
@@ -28,7 +42,7 @@ class TelegramNotifier:
 
 🔗 <b>LINKS RÁPIDOS:</b>
 <a href="{match_notification.excapper_link}">📊 Página de Dados</a>
-<a href="{match_notification.betfair_link if match_notification.betfair_link else '#'}">💰 Mercado Betfair</a>
+<a href="{final_betfair_link if final_betfair_link else '#'}">💰 Mercado Betfair (Indicado)</a>
         """
         
         # Telegram has a 4096 character limit. Truncate if necessary (safe limit 4000)

@@ -130,10 +130,35 @@ class ExcapperScraper:
         await self.page.goto(match_notification.excapper_link)
         await self.page.wait_for_load_state("networkidle")
         
-        # Extract Betfair link
-        betfair_btn = await self.page.query_selector('a.btn[href*="betfair.com"]')
-        if betfair_btn:
-            match_notification.betfair_link = await betfair_btn.get_attribute('href')
+        # Extract Betfair links for all markets from the tabs
+        market_links = {}
+        try:
+            tabs = await self.page.query_selector_all('a.tab')
+            for tab in tabs:
+                name = (await tab.inner_text()).strip()
+                href = await tab.get_attribute('href')
+                if href and '#tab_content_' in href:
+                    market_id = href.split('_')[-1]
+                    # Format: 1.XXXXXX
+                    market_links[name] = f"https://www.betfair.com/exchange/plus/football/market/1.{market_id}"
+            
+            match_notification.market_links = market_links
+            
+            # Use 'Match Odds' as default betfair_link if available
+            if "Match Odds" in market_links:
+                match_notification.betfair_link = market_links["Match Odds"]
+            elif not match_notification.betfair_link and market_links:
+                # Use first available link as fallback
+                match_notification.betfair_link = list(market_links.values())[0]
+                
+        except Exception as e:
+            logging.warning(f"Failed to extract market links: {e}")
+
+        # Extract primary Betfair link button if still needed
+        if not match_notification.betfair_link:
+            betfair_btn = await self.page.query_selector('a.btn[href*="betfair.com"]')
+            if betfair_btn:
+                match_notification.betfair_link = await betfair_btn.get_attribute('href')
             
         # Extract all relevant tables
         tables_data = {}
