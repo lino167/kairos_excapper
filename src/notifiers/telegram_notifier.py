@@ -33,7 +33,7 @@ class TelegramNotifier:
                         break
 
         message = f"""
-⚡ <b>KAIROS PRO BOT - NOVO SINAL!</b> ⚡
+⚡ <b>KAIROS PRO BOT - ALERTA DE ENTRADA!</b> ⚡
 
 ⚽ <b>{match_notification.home_team}</b> vs <b>{match_notification.away_team}</b>
 📈 <b>Detector:</b> {match_notification.notified_market}
@@ -42,9 +42,9 @@ class TelegramNotifier:
 
 🔗 <b>LINKS RÁPIDOS:</b>
 <a href="{match_notification.excapper_link}">📊 Página de Dados</a>
-<a href="{final_betfair_link if final_betfair_link else '#'}">💰 Mercado Betfair (Indicado)</a>
+<a href="{final_betfair_link if final_betfair_link else '#'}">💰 Link Betfair</a>
         """
-        
+
         # Telegram has a 4096 character limit. Truncate if necessary (safe limit 4000)
         if len(message) > 4090:
             message = message[:4000] + "\n\n<i>... [Texto truncado por limite de caracteres]</i>"
@@ -52,8 +52,8 @@ class TelegramNotifier:
         try:
             logging.info(f"Sending Telegram alert for Match: {match_notification.home_team}")
             await self.bot.send_message(
-                chat_id=self.chat_id, 
-                text=message, 
+                chat_id=self.chat_id,
+                text=message,
                 parse_mode='HTML',
                 disable_web_page_preview=True
             )
