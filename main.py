@@ -59,6 +59,23 @@ class KairosExcapperBot:
                 detailed_notif = await self.excapper_scraper.extract_match_details(match_notif)
                 logging.info(f"Extracted details for {match_notif.home_team}")
                 
+                # --- NEW VOLUME FILTERING (Summ above 6000) ---
+                max_volume = 0
+                for table_id, rows in (detailed_notif.cleaned_data or {}).items():
+                    for row in rows:
+                        # Try 'Summ', 'Sum', or 'Summ_1' which are common keys for volume
+                        volume = row.get('Summ') or row.get('Sum') or row.get('Summ_1') or 0
+                        if isinstance(volume, (int, float)) and volume > max_volume:
+                            max_volume = volume
+                
+                logging.info(f"Maximum volume for {match_notif.home_team}: {max_volume}")
+                
+                if max_volume < 6000:
+                    logging.info(f"⏭️ Skipping {match_notif.home_team}: Volume {max_volume} is below 6000.")
+                    self.notified_matches.add(match_notif.id) 
+                    continue
+                # ---------------------------------------------
+                
                 # 2. AI Analysis
                 detailed_notif = await self.ai.analyze_match(detailed_notif)
                 logging.info("AI Analysis completed.")
