@@ -18,6 +18,7 @@ class MatchNotification(BaseModel):
     market_links: Optional[Dict[str, str]] = {} # Market Name -> Betfair Link
     ai_analysis: Optional[str] = None
     raw_data: Optional[str] = None # Dados brutos textuais extras (ex: Dropping-Odds)
+    should_notify: bool = True     # Decisão da IA de enviar ou não
 
 class ExcapperLoginResult(BaseModel):
     success: bool

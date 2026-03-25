@@ -76,24 +76,16 @@ class KairosExcapperBot:
                     continue
                 # ---------------------------------------------
                 
-                # 2. AI Analysis
+                # 2. IA decide se o sinal é bom e gera análise
                 detailed_notif = await self.ai.analyze_match(detailed_notif)
-                logging.info("AI Analysis completed.")
                 
-                # 3. Final Filter: Only notify if AI says "SIM"
-                ai_res = detailed_notif.ai_analysis.upper()
-                send_signal = False
-                if "ENVIAR SINAL:" in ai_res:
-                    decision_part = ai_res.split("ENVIAR SINAL:")[1]
-                    if "SIM" in decision_part and "NÃO" not in decision_part[:10]: # Check if SIM is the primary answer
-                        send_signal = True
-                
-                if send_signal:
-                    await self.telegram.send_match_alert(detailed_notif)
-                    logging.info(f"Notification sent (AI Approved) for {match_notif.home_team}")
+                # 3. Verifica se a IA deu o sinal verde para enviar (should_notify)
+                if not detailed_notif.should_notify:
+                    logging.info(f"Sinal REJEITADO pela IA para {match_notif.home_team}. Motivo: {detailed_notif.ai_analysis[:50]}...")
                 else:
-                    logging.info(f"Signal REJECTED by AI for {match_notif.home_team}. Skipping notification.")
-                    
+                    await self.telegram.send_match_alert(detailed_notif)
+                    logging.info(f"Notificação ENVIADA (Aprovada pela IA) para {match_notif.home_team}")
+                
                 self.notified_matches.add(match_notif.id)
             except Exception as e:
                 logging.error(f"Error processing match {match_notif.id}: {e}")

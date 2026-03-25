@@ -26,7 +26,7 @@ class AIService:
     def generate_analysis_prompt(self, match_notification: MatchNotification):
         """Build the prompt for match analysis."""
         data_text = ""
-        
+
         # Use cleaned_data for a more structured prompt if available
         if match_notification.cleaned_data:
             for table_id, rows in match_notification.cleaned_data.items():
@@ -41,80 +41,84 @@ class AIService:
                 data_text += f"\nTabela: {table_id}\n"
                 for row in row_data:
                     data_text += " | ".join(row) + "\n"
-                
+
         # Incluir tabelas específicas do Dropping-Odds se disponíveis
         if match_notification.raw_data:
             data_text += f"\n### DADOS ADICIONAIS DO MONITOR DE DROPS (Dropping-Odds):\n{match_notification.raw_data}\n"
-            
+
         prompt = f"""
         Você é um apostador profissional com anos de estrada, daqueles que conhece cada movimento do mercado e tem um estilo direto, descolado e sem enrolação.
         Analise os seguintes dados de mercado para a partida:
-        
+
         PARTIDA: {match_notification.home_team} vs {match_notification.away_team}
         SITUAÇÃO: {match_notification.notified_market}
-        
+
         ### Guia Técnico (Para seu entendimento):
         - Summ: Volume total (liquidez).
         - Change: Grana que entrou agora. Ex: "2000 / 13%" é volume novo.
         - Odds: Cotação do momento.
         - Score/Time: Placar e minuto.
-        
+
         ### Dados Coletados:
         {data_text}
-        
+
         ### Sua Missão:
-        Dê o seu veredito como quem está no grupo de elite dos apostadores. Use gírias do meio (derretendo, forra, entrada de valor, unidade, liquidez, back/lay) mas mantenha a autoridade. 
-        
+        Dê o seu veredito como quem está no grupo de elite dos apostadores. Use gírias do meio (derretendo, forra, entrada de valor, unidade, liquidez, back/lay) mas mantenha a autoridade.
+
         REGRAS CRÍTICAS:
         1. NÃO mencione nomes de sites ou ferramentas (nada de falar "dados do Excapper" ou "Dropping-Odds").
         2. Fale como se você estivesse vendo o mercado agora.
         3. Seja direto. Se o cenário for ruim, diga que é "furada". Se for bom, diga que a "odd tá de valor".
-        
+
         ### 🚨 FORMATO DO ALERTA (Obrigatório):
         Sua resposta deve ser curta e matadora, seguindo este modelo exato:
-        
+
         <b>📊 VISÃO DO ESPECIALISTA:</b>
         [Um parágrafo curto e 'pro' sobre o movimento. Ex: "A odd tá derretendo no final e entrou um volume pesado que indica o gol. O mercado tá nervoso!"]
-        
+
         <b>🔥 INDICAÇÃO:</b> [Back/Lay/Over] [Seleção]
         <b>⚽ MERCADO:</b> [Nome do Mercado]
         <b>💰 ODD MÍNIMA:</b> [Cotação sugerida]
         <b>⭐ CONFIANÇA:</b> [1 a 10]
-        <b>📝 FEELING:</b> [Uma frase curta justificando a entrada com base no seu feeling de especialista]
-        
-        <b>✅ ENVIAR SINAL:</b> [SIM/NÃO]
-        (Só responda SIM se o cenário for realmente lucrativo. Se for arriscado ou sem liquidez, mande um NÃO)
-        
-        IMPORTANTE: NÃO use markdown (nada de asteriscos). 
+        <b>📝 FEELING:</b> [Uma frase curta justificando a entrada]
+
+        IMPORTANTE: NÃO use markdown (nada de asteriscos).
         Use EXCLUSIVAMENTE a tag HTML <b> para negrito.
         """
         return prompt
 
     async def analyze_match(self, match_notification: MatchNotification):
-        logging.info(f"Analyzing match with {self.provider}...")
+        logging.info(f"Analisando partida com {self.provider}...")
         prompt = self.generate_analysis_prompt(match_notification)
-        
+
         try:
+            content = ""
             if self.provider == "gemini" and GEMINI_API_KEY:
                 response = self.model.generate_content(prompt)
-                
-                # Check if the response contains valid text to avoid 
-                # "quick accessor requires valid Part" error
                 if response.candidates and any(c.content.parts for c in response.candidates):
-                    match_notification.ai_analysis = response.text
+                    content = response.text
                 else:
-                    match_notification.ai_analysis = "A análise da IA foi bloqueada ou não retornou dados (possivelmente por política de conteúdo). Verifique os dados da partida."
+                    content = "[ENVIAR: NÃO] Análise bloqueada por política de conteúdo."
             elif self.provider == "openai" and OPENAI_API_KEY:
                 response = self.client.chat.completions.create(
                     model="gpt-4-turbo-preview",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=1000
                 )
-                match_notification.ai_analysis = response.choices[0].message.content
+                content = response.choices[0].message.content
+
+            # --- Lógica de Filtro e Limpeza ---
+            if "[ENVIAR: SIM]" in content:
+                match_notification.should_notify = True
+                # Removemos a tag da mensagem do Telegram
+                match_notification.ai_analysis = content.replace("[ENVIAR: SIM]", "").strip()
             else:
-                match_notification.ai_analysis = "AI Analysis unavailable (Check API keys)."
+                match_notification.should_notify = False
+                match_notification.ai_analysis = content.replace("[ENVIAR: NÃO]", "").strip()
+
         except Exception as e:
-            logging.error(f"AI analysis failed: {e}")
-            match_notification.ai_analysis = f"Analysis error: {e}"
-        
+            logging.error(f"Erro na análise: {e}")
+            match_notification.should_notify = False
+            match_notification.ai_analysis = f"Erro na análise: {e}"
+
         return match_notification
