@@ -88,6 +88,9 @@ class AIService:
         <b>⭐ CONFIANÇA:</b> [1 a 10]
         <b>📝 RESUMO:</b> [Uma frase "matadora" justificando o sinal]
         
+        <b>✅ ENVIAR SINAL:</b> [SIM/NÃO]
+        (Só responda SIM se houver valor real e a aposta fizer sentido técnico. Se for perigoso ou sem valor, responda NÃO)
+        
         IMPORTANTE: NÃO use markdown (nada de asteriscos). 
         Se você precisar destacar algo em negrito, use EXCLUSIVAMENTE a tag HTML: <b>texto desejado</b>.
         """

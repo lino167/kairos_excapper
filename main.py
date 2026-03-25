@@ -63,10 +63,21 @@ class KairosExcapperBot:
                 detailed_notif = await self.ai.analyze_match(detailed_notif)
                 logging.info("AI Analysis completed.")
                 
-                # 3. Notify Telegram
-                await self.telegram.send_match_alert(detailed_notif)
+                # 3. Final Filter: Only notify if AI says "SIM"
+                ai_res = detailed_notif.ai_analysis.upper()
+                send_signal = False
+                if "ENVIAR SINAL:" in ai_res:
+                    decision_part = ai_res.split("ENVIAR SINAL:")[1]
+                    if "SIM" in decision_part and "NÃO" not in decision_part[:10]: # Check if SIM is the primary answer
+                        send_signal = True
+                
+                if send_signal:
+                    await self.telegram.send_match_alert(detailed_notif)
+                    logging.info(f"Notification sent (AI Approved) for {match_notif.home_team}")
+                else:
+                    logging.info(f"Signal REJECTED by AI for {match_notif.home_team}. Skipping notification.")
+                    
                 self.notified_matches.add(match_notif.id)
-                logging.info(f"Notification sent for {match_notif.home_team}")
             except Exception as e:
                 logging.error(f"Error processing match {match_notif.id}: {e}")
 
