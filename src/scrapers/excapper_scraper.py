@@ -166,12 +166,27 @@ class ExcapperScraper:
         for idx, table in enumerate(tables):
             rows = await table.query_selector_all('tr')
             table_rows = []
-            for row in rows:
+            for idx_row, row in enumerate(rows):
                 cols = await row.query_selector_all('td, th')
+                row_class = await row.get_attribute('class') or ""
                 row_data = [await col.inner_text() for col in cols]
-                # Filter out empty or mostly empty rows
+                
                 if any(cell.strip() for cell in row_data):
+                    # DETECT EVENTS (Red Cards / Goals)
+                    if "red-row" in row_class:
+                        row_data.append("[RED_CARD]")
+                    elif "scored" in row_class:
+                        row_data.append("[GOAL/PENALTY]")
+                    else:
+                        row_data.append("") # Empty for normal lines
+                        
                     table_rows.append(row_data)
+            
+            # If we added markers, we need to ensure the first row (header) has a label
+            if table_rows and len(table_rows[0]) > 0:
+                # Add "Internal_Events" column header to the first row if missing
+                if len(table_rows[0]) == len(table_rows[1]) - 1:
+                     table_rows[0].append("Internal_Events")
 
             # Only include tables that seem to have data (more than 1 row/column)
             if len(table_rows) > 1 and len(table_rows[0]) > 1:
