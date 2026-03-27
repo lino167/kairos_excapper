@@ -53,18 +53,24 @@ class AIService:
         PARTIDA: {match_notification.home_team} vs {match_notification.away_team}
         SITUAÇÃO: {match_notification.notified_market}
 
-        ### REGRAS DE ESTRATÉGIA MONEY WAY (FILTRO CRÍTICO):
-        Você SÓ deve aprovar (ENVIAR SINAL: SIM) se estas métricas forem respeitadas:
-        1. **Volume Mínimo na Seleção**: "Summ" (Volume correspondido na seleção) > 6000€.
-        2. **Concentração**: "Percent money on market" (Dinheiro total do mercado nessa seleção) > 75%.
-        3. **Faixa de Odd**: A odd atual deve estar entre 1.50 e 4.50.
-        4. **Odd Inicial**: A Odd de partida (Start Odds) deve ser superior a 2.00.
-        5. **Variação Mínima**: Queda (Drop) superior a 15% em relação à odd inicial.
+        ### 📋 ESTRATÉGIAS DE ANÁLISE (O BOT SÓ APROVA SE ENCAIXAR EM UMA DELAS):
         
-        ### FILTRO DE EVENTOS (RED CARDS / GOALS):
-        - Verifique a coluna "Internal_Events". Se houver as marcas [RED_CARD] ou [GOAL/PENALTY] no tempo do Drop, analise se o drop foi apenas pela vantagem numérica/placar.
-        - Se o Drop for causado APENAS por um cartão vermelho ou gol, e não por volume estratégico antecipado, responda ENVIAR SINAL: NÃO.
-        - Smart Money real entra ANTES dos grandes eventos ou se mantém constante a despeito deles.
+        #### PROTOCOLO 1: MONEY WAY (Liderança e Liquidez)
+        - **Volume**: "Summ" > 6000€.
+        - **Concentração**: "Percent money on market" > 75%.
+        - **Janela de Odd**: Entre 1.50 e 4.50.
+        - **Drop**: Queda superior a 15% em relação à Odd Inicial (> 2.00).
+        
+        #### PROTOCOLO 2: SHARP BETS (Explosão de Momentum)
+        - **Pico de 1 Min**: "Change %" superior a 80% (Entrada massiva repentina).
+        - **Valor da Odd**: Odds atuais superiores a 4.50 (Sharps pegando valor alto).
+        - **Variação**: Queda superior a 10% da odd inicial.
+        - **Status**: O jogo deve estar obrigatoriamente em "Live".
+        - **Volume Mínimo**: "Summ" > 100€ (mesmo com volume baixo, o % de subida deve ser enorme).
+        
+        ### 🛡️ FILTRO DE SEGURANÇA (OBRIGATÓRIO):
+        - Se o Drop/Pico foi causado APENAS por um cartão vermelho (`[RED_CARD]`) ou gol (`[GOAL/PENALTY]`), responda ENVIAR SINAL: NÃO.
+        - O sinal deve ser fruto de movimentação estratégica de mercado, não apenas reação ao placar.
         
         ### Guia de Colunas do Excapper:
         - Summ: Dinheiro correspondido NESSA seleção específica (Gatilho: > 6000€).
