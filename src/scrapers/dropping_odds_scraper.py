@@ -67,7 +67,7 @@ class DroppingOddsScraper:
             logging.error(f"Error fetching live matches: {e}")
             return []
 
-    async def process_game(self, game_id, home, away):
+    async def process_game(self, game_id, home, away, excapper_scraper=None):
         """Processes a single game: checks markets, events, and Excapper link."""
         logging.info(f"🔍 Processing game: {home} vs {away} (ID: {game_id})")
 
@@ -82,12 +82,23 @@ class DroppingOddsScraper:
 
             excapper_link_el = await self.page.query_selector('div.smenu a:has-text("Excapper.com")')
             if not excapper_link_el:
+                # Try waiting briefly for anchor by href
+                try:
+                    await self.page.wait_for_selector('a[href*="excapper.com"]', timeout=2000)
+                except:
+                    pass
                 excapper_link_el = await self.page.query_selector('a[href*="excapper.com"]')
             if not excapper_link_el:
-                logging.info(f"⏭️ Skipping: No Excapper link found.")
-                return None
+                # Fallback: scan HTML for link pattern
+                html = await self.page.content()
+                m = re.search(r'https?://(?:www\.)?excapper\.com/\?action=game&id=\d+', html)
+                if not m:
+                    logging.info(f"⏭️ Skipping: No Excapper link found.")
+                    return None
+                excapper_link_raw = m.group(0)
+            else:
+                excapper_link_raw = await excapper_link_el.get_attribute('href')
 
-            excapper_link_raw = await excapper_link_el.get_attribute('href')
             excapper_link = self._sanitize_excapper_link(excapper_link_raw or "")
             if not self._is_valid_excapper_link(excapper_link):
                 logging.info("⏭️ Skipping: Invalid Excapper link.")
@@ -98,6 +109,41 @@ class DroppingOddsScraper:
             has_event, event_type = await self.check_for_events()
             if has_event:
                 return None
+            # 2.1 Pre-drop snapshot from Excapper (score/minute)
+            match_notif = MatchNotification(
+                id=exc_id,
+                home_team=home,
+                away_team=away,
+                excapper_link=excapper_link,
+                notified_market="Live Drop Search"
+            )
+            if excapper_scraper:
+                try:
+                    tmp_notif = await excapper_scraper.extract_match_details(match_notif)
+                    pre_score = None
+                    pre_minute = None
+                    if tmp_notif.cleaned_data:
+                        for _, rows in tmp_notif.cleaned_data.items():
+                            for row in rows:
+                                sh = row.get("Score_Home")
+                                sa = row.get("Score_Away")
+                                tm = row.get("Time")
+                                if sh is not None and sa is not None:
+                                    try:
+                                        pre_score = f"{int(sh)}-{int(sa)}"
+                                    except:
+                                        pre_score = f"{sh}-{sa}"
+                                if tm is not None and pre_minute is None:
+                                    try:
+                                        pre_minute = str(int(tm)) if isinstance(tm, (int, float)) else str(int(str(tm).split()[0]))
+                                    except:
+                                        pre_minute = str(tm)
+                            if pre_score and pre_minute:
+                                break
+                    match_notif.pre_score = pre_score
+                    match_notif.pre_minute = pre_minute
+                except Exception:
+                    pass
 
             # 3. Visit and extract each market tab
             markets = {
@@ -126,14 +172,6 @@ class DroppingOddsScraper:
                 else:
                     extracted_tables[m_name] = "Tabela não encontrada."
 
-            # 4. Create MatchNotification object
-            match_notif = MatchNotification(
-                id=exc_id,
-                home_team=home,
-                away_team=away,
-                excapper_link=excapper_link,
-                notified_market="Live Drop Search"
-            )
             match_notif.match_data = {"dropping_odds": extracted_tables}
             return match_notif
 

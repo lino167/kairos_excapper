@@ -26,6 +26,21 @@ class AIService:
     def generate_analysis_prompt(self, match_notification: MatchNotification):
         """Build the prompt for match analysis."""
         data_text = ""
+        current_score = None
+        current_minute = None
+        if match_notification.cleaned_data:
+            for _, rows in match_notification.cleaned_data.items():
+                for row in rows:
+                    sh = row.get("Score_Home")
+                    sa = row.get("Score_Away")
+                    tm = row.get("Time")
+                    if sh is not None and sa is not None:
+                        current_score = f"{int(sh) if isinstance(sh, (int, float)) else sh}-{int(sa) if isinstance(sa, (int, float)) else sa}"
+                    if tm is not None and current_minute is None:
+                        try:
+                            current_minute = int(tm) if isinstance(tm, (int, float)) else int(str(tm).split()[0])
+                        except:
+                            current_minute = str(tm)
 
         # Use cleaned_data for a more structured prompt if available
         if match_notification.cleaned_data:
@@ -52,6 +67,8 @@ class AIService:
 
         PARTIDA: {match_notification.home_team} vs {match_notification.away_team}
         SITUAÇÃO: {match_notification.notified_market}
+        PLACAR/MINUTO ANTES DO DROP: {match_notification.pre_score or 'Indisponível'} / {match_notification.pre_minute or 'Indisponível'}
+        PLACAR/MINUTO APÓS O DROP: {current_score or match_notification.post_score or 'Indisponível'} / {current_minute or match_notification.post_minute or 'Indisponível'}
 
         ### 📋 ESTRATÉGIAS DE ANÁLISE (O BOT SÓ APROVA SE ENCAIXAR EM UMA DELAS):
 
@@ -132,6 +149,20 @@ class AIService:
 
             # --- Lógica de Filtro e Registro de Predição ---
             import re
+            # Detectar eventos internos (cartão/gol) nas tabelas para filtro adicional
+            has_blocking_event = False
+            try:
+                if match_notification.cleaned_data:
+                    for _, rows in match_notification.cleaned_data.items():
+                        for row in rows:
+                            ev = row.get("Internal_Events")
+                            if isinstance(ev, str) and ("[RED_CARD]" in ev or "[GOAL/PENALTY]" in ev):
+                                has_blocking_event = True
+                                break
+                        if has_blocking_event:
+                            break
+            except Exception:
+                pass
 
             # Extract Prediction (Ex: 🔥 INDICAÇÃO: Over 2.5)
             prediction = "N/A"
@@ -143,17 +174,33 @@ class AIService:
             if match_pred:
                 prediction = match_pred.group(1).strip()
 
-            if "SIM" in content or "Aprovado" in content or ("<b>🔥 INDICAÇÃO:</b>" in content and "furada" not in content.lower()):
+            # Extrair campos obrigatórios
+            mercado_ok = bool(re.search(r'MERCADO:</b>\s*(.+)', content, re.IGNORECASE))
+            oddm_match = re.search(r'ODD MÍNIMA:</b>\s*([^\n]+)', content, re.IGNORECASE)
+            conf_match = re.search(r'CONFIANÇA:</b>\s*(\d+)', content, re.IGNORECASE)
+            indicacao_ok = "<b>🔥 INDICAÇÃO:</b>" in content or bool(re.search(r'INDICAÇÃO:\s*(.+)', content, re.IGNORECASE))
+            conf_val = int(conf_match.group(1)) if conf_match else None
+
+            aprovado_textual = ("SIM" in content or "Aprovado" in content or ("<b>🔥 INDICAÇÃO:</b>" in content and "furada" not in content.lower()))
+            campos_presentes = indicacao_ok and mercado_ok and oddm_match is not None and conf_val is not None
+            confianca_suficiente = (conf_val is not None and conf_val >= 6)
+            eventos_bloqueiam = has_blocking_event
+
+            if aprovado_textual and campos_presentes and confianca_suficiente and not eventos_bloqueiam:
                 match_notification.should_notify = True
                 match_notification.ai_analysis = content.strip()
-                # Store prediction for DB
-                match_notification.raw_data = prediction # Using raw_data as temp carrier for prediction
+                match_notification.raw_data = prediction
             else:
                 match_notification.should_notify = False
                 match_notification.ai_analysis = content.strip()
-                # Reason for rejection (heurística)
                 reason = "Critérios de aprovação não atendidos"
-                if "furada" in content.lower():
+                if eventos_bloqueiam:
+                    reason = "Drop causado por evento (gol/cartão)"
+                elif not campos_presentes:
+                    reason = "Tags obrigatórias ausentes (INDICAÇÃO/MERCADO/ODD/CONFIANÇA)"
+                elif conf_val is not None and conf_val < 6:
+                    reason = "Confiança insuficiente"
+                elif "furada" in content.lower():
                     reason = "Análise indicou 'furada'"
                 elif "NÃO" in content or "rejeitado" in content.lower():
                     reason = "Resposta negativa explícita"

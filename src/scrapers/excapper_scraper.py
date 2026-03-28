@@ -197,6 +197,29 @@ class ExcapperScraper:
 
         # Populate cleaned data using the DataTransformer
         match_notification.cleaned_data = DataTransformer.process_match_notification(tables_data)
+        # Set post-drop score/minute
+        post_score = None
+        post_minute = None
+        if match_notification.cleaned_data:
+            for _, rows in match_notification.cleaned_data.items():
+                for row in rows:
+                    sh = row.get("Score_Home")
+                    sa = row.get("Score_Away")
+                    tm = row.get("Time")
+                    if sh is not None and sa is not None:
+                        try:
+                            post_score = f"{int(sh)}-{int(sa)}"
+                        except:
+                            post_score = f"{sh}-{sa}"
+                    if tm is not None and post_minute is None:
+                        try:
+                            post_minute = str(int(tm)) if isinstance(tm, (int, float)) else str(int(str(tm).split()[0]))
+                        except:
+                            post_minute = str(tm)
+                if post_score and post_minute:
+                    break
+        match_notification.post_score = post_score
+        match_notification.post_minute = post_minute
 
         return match_notification
 

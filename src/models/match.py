@@ -20,6 +20,10 @@ class MatchNotification(BaseModel):
     raw_data: Optional[str] = None # Dados brutos textuais extras (ex: Dropping-Odds)
     should_notify: bool = True     # Decisão da IA de enviar ou não
     rejection_reason: Optional[str] = None
+    pre_score: Optional[str] = None
+    pre_minute: Optional[str] = None
+    post_score: Optional[str] = None
+    post_minute: Optional[str] = None
 
 class ExcapperLoginResult(BaseModel):
     success: bool
