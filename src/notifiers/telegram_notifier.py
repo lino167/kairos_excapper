@@ -15,6 +15,25 @@ class TelegramNotifier:
             logging.warning("Telegram Bot Token or Chat ID not configured.")
             return
 
+        cur_score = None
+        cur_minute = None
+        if match_notification.cleaned_data:
+            for _, rows in match_notification.cleaned_data.items():
+                for row in rows:
+                    sh = row.get("Score_Home")
+                    sa = row.get("Score_Away")
+                    tm = row.get("Time")
+                    if sh is not None and sa is not None:
+                        try:
+                            cur_score = f"{int(sh)}-{int(sa)}"
+                        except:
+                            cur_score = f"{sh}-{sa}"
+                    if tm is not None:
+                        try:
+                            cur_minute = str(int(tm)) if isinstance(tm, (int, float)) else str(int(str(tm).split()[0]))
+                        except:
+                            cur_minute = str(tm)
+
         # Escape the AI analysis to avoid breaking HTML tags, but then allow <b> specifically
         analysis_escaped = html.escape(match_notification.ai_analysis)
         analysis_escaped = analysis_escaped.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
@@ -32,11 +51,18 @@ class TelegramNotifier:
                         logging.info(f"Using specific Betfair link for market: {market_name}")
                         break
 
+        indicacao_resumo = match_notification.raw_data or "N/A"
+        score_line = f"🔢 <b>Placar:</b> {cur_score or 'Indisponível'}"
+        if cur_minute:
+            score_line += f" | ⏱️ <b>Min:</b> {cur_minute}"
+
         message = f"""
 ⚡ <b>KAIROS PRO BOT - ALERTA DE ENTRADA!</b> ⚡
 
 ⚽ <b>{match_notification.home_team}</b> vs <b>{match_notification.away_team}</b>
 📈 <b>Detector:</b> {match_notification.notified_market}
+{score_line}
+🎯 <b>Indicação (resumo):</b> {indicacao_resumo}
 
 {analysis_escaped}
 
