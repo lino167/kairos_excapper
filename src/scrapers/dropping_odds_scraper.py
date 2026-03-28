@@ -22,144 +22,114 @@ class DroppingOddsScraper:
         await Stealth().apply_stealth_async(self.page)
         return self
 
-    async def extract_market_tables(self, game_id):
-        """Extrai as tabelas de odds de diferentes mercados para um jogo específico."""
-        markets = {
-            '1X2': f"https://dropping-odds.com/event.php?id={game_id}&t=1x2",
-            'Total': f"https://dropping-odds.com/event.php?id={game_id}&t=total",
-            'Handicap': f"https://dropping-odds.com/event.php?id={game_id}&t=handicap",
-            'HT_Total': f"https://dropping-odds.com/event.php?id={game_id}&t=total_ht",
-            'HT_1X2': f"https://dropping-odds.com/event.php?id={game_id}&t=1x2_ht"
-        }
+    async def check_for_events(self):
+        """Checks the current page for Red Card or Penalty icons."""
+        # Red Card: <img src="img/redcard.png">
+        # Penalty: <img src="img/penalty.png">
+        has_red_card = await self.page.query_selector('img[src*="redcard"]') is not None
+        has_penalty = await self.page.query_selector('img[src*="penalty"]') is not None
 
-        extracted_data = {}
+        if has_red_card:
+            logging.warning("🚩 Red Card detected! Skipping match.")
+            return True, "Red Card"
+        if has_penalty:
+            logging.warning("⚽ Penalty detected! Skipping match.")
+            return True, "Penalty"
 
-        for market_name, url in markets.items():
-            try:
-                logging.info(f"Extraindo tabela do mercado {market_name}...")
-                await self.page.goto(url)
-                await self.page.wait_for_timeout(1500)
+        return False, None
 
-                # A tabela de interesse é a que contém os dados de odds
-                # Geralmente é a única tabela principal no corpo
-                table = await self.page.query_selector('table')
-                if table:
-                    # Capturamos o texto formatado para a IA
-                    text = await table.inner_text()
-                    extracted_data[market_name] = text
-                else:
-                    extracted_data[market_name] = "Tabela não encontrada."
-            except Exception as e:
-                logging.error(f"Erro ao extrair mercado {market_name}: {e}")
-                extracted_data[market_name] = f"Erro na extração: {e}"
-
-        return extracted_data
-
-    async def check_drops(self):
-        logging.info("Checking for live drops on Dropping-Odds...")
+    async def get_live_matches(self):
+        """Get the list of live matches from the main live page."""
+        logging.info("Fetching live matches from Dropping-Odds...")
         try:
             await self.page.goto(self.url)
             await self.page.wait_for_load_state("networkidle")
-            await self.page.wait_for_timeout(3000)
+            await self.page.wait_for_timeout(2000)
 
-            # Find all match rows on the live page
             rows = await self.page.query_selector_all('tbody tr.a_link')
-            if not rows:
-                logging.info("No live matches found.")
-                return []
-
-            matches_to_process = []
+            matches = []
             for row in rows:
                 game_id = await row.get_attribute('game_id')
-                if not game_id:
-                    continue
-
+                if not game_id: continue
                 cells = await row.query_selector_all('td')
+                if len(cells) < 5: continue
 
-                # Check for drop (just to include in the metadata, but we won't skip anymore)
-                row_classes = await row.get_attribute('class') or ""
-                has_drop = False
-                drop_text = "Live"
+                home = (await cells[2].inner_text()).strip()
+                away = (await cells[4].inner_text()).strip()
+                matches.append({'id': game_id, 'home': home, 'away': away})
 
-                if any(r in row_classes for r in ['red1', 'red2', 'red3']):
-                    has_drop = True
-                    drop_text = "Drop (TR)"
-
-                if not has_drop:
-                    for cell in cells:
-                        classes = await cell.get_attribute('class') or ""
-                        color = await cell.evaluate('el => window.getComputedStyle(el).backgroundColor')
-                        if any(r in classes for r in ['red1', 'red2', 'red3']):
-                            has_drop = True
-                            drop_text = await cell.inner_text()
-                            break
-                        import re
-                        match = re.search(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', color)
-                        if match and int(match.group(1)) > 180:
-                            has_drop = True
-                            drop_text = await cell.inner_text()
-                            break
-
-                home_team = await cells[2].inner_text() if len(cells) > 2 else "Unknown"
-                away_team = await cells[4].inner_text() if len(cells) > 4 else "Unknown"
-
-                # Agora coletamos TODOS os jogos para verificar o Excapper lá dentro
-                matches_to_process.append({
-                    'game_id': game_id,
-                    'home': home_team.strip(),
-                    'away': away_team.strip(),
-                    'market': drop_text.strip(),
-                    'has_active_drop': has_drop
-                })
-
-            logging.info(f"Encontrados {len(matches_to_process)} jogos live para verificar detalhes...")
-
-            final_matches = []
-            for item in matches_to_process:
-                logging.info(f"Verificando detalhes de: {item['home']} vs {item['away']} (ID: {item['game_id']})")
-
-                # 4. Verificar se tem link do Excapper (entramos em cada um!)
-                try:
-                    await self.page.goto(f"https://dropping-odds.com/event.php?id={item['game_id']}")
-                    await self.page.wait_for_timeout(1500)
-
-                    excapper_link_el = await self.page.query_selector('a[href*="excapper.com"]')
-                    if not excapper_link_el:
-                        # logging.info(f"Skip: Sem link Excapper.")
-                        continue
-
-                    excapper_link = await excapper_link_el.get_attribute('href')
-                    exc_id = excapper_link.split('=')[-1]
-
-                    logging.info(f"✨ Link Excapper encontrado! Extraindo tabelas de mercado...")
-
-                    # 5. Extraímos as tabelas do Dropping-Odds
-                    extra_tables = await self.extract_market_tables(item['game_id'])
-
-                    match_notif = MatchNotification(
-                        id=exc_id,
-                        home_team=item['home'],
-                        away_team=item['away'],
-                        excapper_link=excapper_link,
-                        notified_market=f"Live (Drop: {item['has_active_drop']})"
-                    )
-
-                    match_notif.raw_data = f"--- DADOS DO DROPPING-ODDS ---\n"
-                    for m_name, m_text in extra_tables.items():
-                        match_notif.raw_data += f"\n Mercado {m_name}:\n{m_text}\n"
-
-                    final_matches.append(match_notif)
-                except Exception as e:
-                    logging.error(f"Erro ao acessar {item['home']}: {e}")
-                    continue
-
-            # Voltar para a home no final do ciclo
-            await self.page.goto(self.url)
-            logging.info(f"Ciclo finalizado. Encontrados {len(final_matches)} jogos qualificados.")
-            return final_matches
+            return matches
         except Exception as e:
-            logging.error(f"Error checking live dropping-odds: {e}")
+            logging.error(f"Error fetching live matches: {e}")
             return []
+
+    async def process_game(self, game_id, home, away):
+        """Processes a single game: checks markets, events, and Excapper link."""
+        logging.info(f"🔍 Processing game: {home} vs {away} (ID: {game_id})")
+
+        # 1. First visit main event page to find Excapper link
+        try:
+            await self.page.goto(f"https://dropping-odds.com/event.php?id={game_id}")
+            await self.page.wait_for_timeout(1000)
+
+            excapper_link_el = await self.page.query_selector('a[href*="excapper.com"]')
+            if not excapper_link_el:
+                logging.info(f"⏭️ Skipping: No Excapper link found.")
+                return None
+
+            excapper_link = await excapper_link_el.get_attribute('href')
+            exc_id = excapper_link.split('=')[-1]
+
+            # 2. Check for events on the main page first
+            has_event, event_type = await self.check_for_events()
+            if has_event:
+                return None
+
+            # 3. Visit and extract each market tab
+            markets = {
+                '1X2': '1x2',
+                'Total': 'total',
+                'Handicap': 'handicap',
+                'HT_Total': 'total_ht',
+                'HT_1X2': '1x2_ht'
+            }
+
+            extracted_tables = {}
+            for m_name, m_code in markets.items():
+                url = f"https://dropping-odds.com/event.php?id={game_id}&t={m_code}"
+                await self.page.goto(url)
+                await self.page.wait_for_timeout(1000)
+
+                # Check for events in each market too
+                has_event, _ = await self.check_for_events()
+                if has_event:
+                    return None
+
+                table = await self.page.query_selector('table')
+                if table:
+                    # We store the table as HTML or clean text for the DB
+                    extracted_tables[m_name] = await table.inner_text()
+                else:
+                    extracted_tables[m_name] = "Tabela não encontrada."
+
+            # 4. Create MatchNotification object
+            match_notif = MatchNotification(
+                id=exc_id,
+                home_team=home,
+                away_team=away,
+                excapper_link=excapper_link,
+                notified_market="Live Drop Search"
+            )
+            match_notif.match_data = {"dropping_odds": extracted_tables}
+            return match_notif
+
+        except Exception as e:
+            logging.error(f"Error processing game {game_id}: {e}")
+            return None
+
+    async def check_drops(self):
+        """Deprecated: Use get_live_matches + process_game instead for the new flow."""
+        return []
 
     async def close(self):
         try:

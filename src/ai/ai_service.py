@@ -54,24 +54,24 @@ class AIService:
         SITUAÇÃO: {match_notification.notified_market}
 
         ### 📋 ESTRATÉGIAS DE ANÁLISE (O BOT SÓ APROVA SE ENCAIXAR EM UMA DELAS):
-        
+
         #### PROTOCOLO 1: MONEY WAY (Liderança e Liquidez)
         - **Volume**: "Summ" > 6000€.
         - **Concentração**: "Percent money on market" > 75%.
         - **Janela de Odd**: Entre 1.50 e 4.50.
         - **Drop**: Queda superior a 15% em relação à Odd Inicial (> 2.00).
-        
+
         #### PROTOCOLO 2: SHARP BETS (Explosão de Momentum)
         - **Pico de 1 Min**: "Change %" superior a 80% (Entrada massiva repentina).
         - **Valor da Odd**: Odds atuais superiores a 4.50 (Sharps pegando valor alto).
         - **Variação**: Queda superior a 10% da odd inicial.
         - **Status**: O jogo deve estar obrigatoriamente em "Live".
         - **Volume Mínimo**: "Summ" > 100€ (mesmo com volume baixo, o % de subida deve ser enorme).
-        
+
         ### 🛡️ FILTRO DE SEGURANÇA (OBRIGATÓRIO):
         - Se o Drop/Pico foi causado APENAS por um cartão vermelho (`[RED_CARD]`) ou gol (`[GOAL/PENALTY]`), responda ENVIAR SINAL: NÃO.
         - O sinal deve ser fruto de movimentação estratégica de mercado, não apenas reação ao placar.
-        
+
         ### Guia de Colunas do Excapper:
         - Summ: Dinheiro correspondido NESSA seleção específica (Gatilho: > 6000€).
         - Change: Dinheiro novo que entrou AGORA em Summ (Ex: 200€ / 3.3%).
@@ -130,14 +130,27 @@ class AIService:
                 )
                 content = response.choices[0].message.content
 
-            # --- Lógica de Filtro e Limpeza ---
-            if "[ENVIAR: SIM]" in content:
+            # --- Lógica de Filtro e Registro de Predição ---
+            import re
+
+            # Extract Prediction (Ex: 🔥 INDICAÇÃO: Over 2.5)
+            prediction = "N/A"
+            match_pred = re.search(r'🔥 INDICAÇÃO:</b>\s*(.*)', content) or re.search(r'🔥 INDICAÇÃO:</b>\s*(.*)', content.replace('<b>', '<b>'))
+            if not match_pred:
+                # Fallback search if tag style varies
+                match_pred = re.search(r'INDICAÇÃO: (.*)', content, re.IGNORECASE)
+
+            if match_pred:
+                prediction = match_pred.group(1).strip()
+
+            if "SIM" in content or "Aprovado" in content or ("<b>🔥 INDICAÇÃO:</b>" in content and "furada" not in content.lower()):
                 match_notification.should_notify = True
-                # Removemos a tag da mensagem do Telegram
-                match_notification.ai_analysis = content.replace("[ENVIAR: SIM]", "").strip()
+                match_notification.ai_analysis = content.strip()
+                # Store prediction for DB
+                match_notification.raw_data = prediction # Using raw_data as temp carrier for prediction
             else:
                 match_notification.should_notify = False
-                match_notification.ai_analysis = content.replace("[ENVIAR: NÃO]", "").strip()
+                match_notification.ai_analysis = content.strip()
 
         except Exception as e:
             logging.error(f"Erro na análise: {e}")
