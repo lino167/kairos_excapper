@@ -29,3 +29,6 @@ CHECK_INTERVAL_SECONDS = int(os.getenv('CHECK_INTERVAL_SECONDS', '300')) # Defau
 # Notification message for unauthenticated table
 AUTH_REQUIRED_MESSAGE = "Login to the site to set up games in your favorites"
 NO_NOTIFICATIONS_MESSAGE = "Configure the settings to add games to your notification or nothing was found by your parameters"
+
+# Test mode: send rejected analyses to Telegram
+SEND_REJECTED_TO_TELEGRAM = os.getenv('SEND_REJECTED_TO_TELEGRAM', 'False').lower() == 'true'

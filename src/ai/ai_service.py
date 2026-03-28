@@ -151,10 +151,18 @@ class AIService:
             else:
                 match_notification.should_notify = False
                 match_notification.ai_analysis = content.strip()
+                # Reason for rejection (heurística)
+                reason = "Critérios de aprovação não atendidos"
+                if "furada" in content.lower():
+                    reason = "Análise indicou 'furada'"
+                elif "NÃO" in content or "rejeitado" in content.lower():
+                    reason = "Resposta negativa explícita"
+                match_notification.rejection_reason = reason
 
         except Exception as e:
             logging.error(f"Erro na análise: {e}")
             match_notification.should_notify = False
             match_notification.ai_analysis = f"Erro na análise: {e}"
+            match_notification.rejection_reason = "Erro na análise"
 
         return match_notification

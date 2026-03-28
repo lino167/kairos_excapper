@@ -19,6 +19,7 @@ class MatchNotification(BaseModel):
     ai_analysis: Optional[str] = None
     raw_data: Optional[str] = None # Dados brutos textuais extras (ex: Dropping-Odds)
     should_notify: bool = True     # Decisão da IA de enviar ou não
+    rejection_reason: Optional[str] = None
 
 class ExcapperLoginResult(BaseModel):
     success: bool

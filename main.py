@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from src.core.config import LOG_LEVEL, CHECK_INTERVAL_SECONDS, AI_PROVIDER, BROWSER_HEADLESS
+from src.core.config import SEND_REJECTED_TO_TELEGRAM
 from src.scrapers.excapper_scraper import ExcapperScraper
 from src.scrapers.dropping_odds_scraper import DroppingOddsScraper
 from src.ai.ai_service import AIService
@@ -37,7 +38,7 @@ class KairosExcapperBot:
         while True:
             try:
                 logging.info("\n🚀 --- STARTING NEW SCAN CYCLE ---")
-                
+
                 # 1. Get live games from Dropping-Odds list
                 live_games = await self.dropping_odds_scraper.get_live_matches()
                 logging.info(f"Found {len(live_games)} live matches on Dropping-Odds.")
@@ -76,10 +77,10 @@ class KairosExcapperBot:
                     # 5. AI Analysis
                     try:
                         match_notif = await self.ai.analyze_match(match_notif)
-                        
+
                         self.db.update_analysis(
-                            match_id=match_notif.id, 
-                            analysis=match_notif.ai_analysis, 
+                            match_id=match_notif.id,
+                            analysis=match_notif.ai_analysis,
                             should_notify=match_notif.should_notify,
                             prediction=match_notif.raw_data # Stored here by AIService
                         )
@@ -89,18 +90,24 @@ class KairosExcapperBot:
                             await self.telegram.send_match_alert(match_notif)
                             logging.info(f"🔔 Notification SENT for {match_notif.home_team}")
                         else:
-                            logging.info(f"❌ AI Rejected Signal for {match_notif.home_team}")
+                            logging.info(f"❌ AI Rejected Signal for {match_notif.home_team}: {match_notif.rejection_reason}")
+                            if SEND_REJECTED_TO_TELEGRAM:
+                                reason = match_notif.rejection_reason or "Critérios de aprovação não atendidos"
+                                prefix = f"<b>[TESTE] IA REJEITOU:</b> {reason}\n"
+                                match_notif.ai_analysis = prefix + (match_notif.ai_analysis or "")
+                                await self.telegram.send_match_alert(match_notif)
+                                logging.info(f"🔔 Test notification SENT (rejected) for {match_notif.home_team}")
 
                     except Exception as e:
                         logging.error(f"AI Analysis Error: {e}")
 
                 logging.info(f"--- Cycle completed. Waiting {CHECK_INTERVAL_SECONDS} seconds ---")
-                
+
                 # --- NEW: Check for matches that need result verification ---
                 await self.verify_past_matches()
-                
+
                 await asyncio.sleep(CHECK_INTERVAL_SECONDS)
-                
+
             except Exception as e:
                 logging.error(f"System error in main loop: {e}")
                 await asyncio.sleep(60)
@@ -109,7 +116,7 @@ class KairosExcapperBot:
         """Checks past notified matches to extract final data and results."""
         logging.info("🔎 Checking for matches to verify results...")
         pending_verification = self.db.get_matches_for_verification()
-        
+
         if not pending_verification:
             logging.info("No matches pending verification.")
             return
@@ -117,7 +124,7 @@ class KairosExcapperBot:
         for match_data in pending_verification:
             match_id = match_data['id']
             logging.info(f"⌛ Verifying result for match: {match_data['home_team']} (ID: {match_id})")
-            
+
             try:
                 # Create a temporary MatchNotification object
                 stored_notif = MatchNotification(
@@ -126,10 +133,10 @@ class KairosExcapperBot:
                     away_team=match_data['away_team'],
                     excapper_link=match_data['excapper_link']
                 )
-                
+
                 # 1. Re-extract full data from Excapper (post-match)
                 verified_notif = await self.excapper_scraper.extract_match_details(stored_notif)
-                
+
                 # 2. Extract final score/result (Best effort from tables)
                 final_score = "Unknown"
                 # Look for 'FT' or 'Final' or latest score in match_data tables
