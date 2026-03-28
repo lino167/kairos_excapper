@@ -46,7 +46,7 @@ class KairosExcapperBot:
                 for game in live_games:
                     # 2. Process game: Search each market for drops & check events (Red/Penalty)
                     match_notif = await self.dropping_odds_scraper.process_game(
-                        game['id'], game['home'], game['away']
+                        game['id'], game['home'], game['away'], self.excapper_scraper
                     )
 
                     if not match_notif:
