@@ -5,6 +5,7 @@ from playwright_stealth import Stealth
 from src.core.config import EXCAPPER_USER, EXCAPPER_PASS, AUTH_REQUIRED_MESSAGE, NO_NOTIFICATIONS_MESSAGE
 from src.models.match import MatchNotification, ExcapperLoginResult
 from src.core.data_transformer import DataTransformer
+import asyncio
 
 class ExcapperScraper:
     def __init__(self, headless=False):
@@ -13,10 +14,11 @@ class ExcapperScraper:
         self.page = None
         self.headless = headless
         self.url = "https://www.excapper.com/"
+        self._playwright = None
 
     async def init_browser(self):
-        playwright = await async_playwright().start()
-        self.browser = await playwright.chromium.launch(headless=self.headless)
+        self._playwright = await async_playwright().start()
+        self.browser = await self._playwright.chromium.launch(headless=self.headless)
         self.context = await self.browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
@@ -231,5 +233,7 @@ class ExcapperScraper:
                 await self.context.close()
             if self.browser:
                 await self.browser.close()
+            if self._playwright:
+                await self._playwright.stop()
         except:
             pass

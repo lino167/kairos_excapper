@@ -10,7 +10,7 @@ class MatchNotification(BaseModel):
     id: str
     home_team: str
     away_team: str
-    excapper_link: str
+    excapper_link: Optional[str] = None
     betfair_link: Optional[str] = None
     notified_market: Optional[str] = None
     match_data: Optional[Dict[str, List[List[str]]]] = {} # Raw extracted tables (List of Lists)

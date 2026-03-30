@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import json
 
 # Load environment variables from config/.env if it exists
 load_dotenv(os.path.join(os.getcwd(), 'config', '.env'))
@@ -20,6 +21,18 @@ AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')
 # Supabase Configuration
 SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://dkwdtvaysyhvchrazutz.supabase.co')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY', '') or os.getenv('api_key_supabase', '')
+
+# Optional: Load Supabase from Trae MCP config if env missing
+try:
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        mcp_path = os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Trae", "User", "mcp.json")
+        if os.path.isfile(mcp_path):
+            with open(mcp_path, "r", encoding="utf-8") as f:
+                mcp_cfg = json.load(f)
+            SUPABASE_URL = SUPABASE_URL or mcp_cfg.get("SUPABASE_URL", SUPABASE_URL)
+            SUPABASE_KEY = SUPABASE_KEY or mcp_cfg.get("SUPABASE_SERVICE_ROLE_KEY", SUPABASE_KEY)
+except Exception:
+    pass
 
 # Application Settings
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

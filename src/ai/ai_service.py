@@ -1,8 +1,11 @@
 import logging
 import google.generativeai as genai
+import re
 from openai import OpenAI
 from src.core.config import GEMINI_API_KEY, OPENAI_API_KEY
 from src.models.match import MatchNotification
+from src.core.database_service import DatabaseService
+from src.ai.pattern_seeker import PatternSeeker
 
 class AIService:
     def __init__(self, provider="openai"):
@@ -22,8 +25,11 @@ class AIService:
             self.client = OpenAI(api_key=OPENAI_API_KEY)
         else:
             logging.warning(f"No API key provided for AI provider: {provider}")
+        
+        self.db = DatabaseService()
+        self.seeker = PatternSeeker(self.db)
 
-    def generate_analysis_prompt(self, match_notification: MatchNotification):
+    def generate_analysis_prompt(self, match_notification: MatchNotification, historical_patterns: str = ""):
         """Build the prompt for match analysis."""
         data_text = ""
         current_score = None
@@ -102,6 +108,9 @@ class AIService:
         ### Dados Coletados:
         {data_text}
 
+        ### 📚 HISTÓRICO DE SUCESSO (IA TREINADA EM PADRÕES VITORIOSOS):
+        {historical_patterns or "Nenhum histórico recente disponível. Use as estratégias padrão."}
+
         ### Sua Missão:
         Como tipster, dê um veredito curto, confiante e divertido, usando metáforas do futebol e do trade quando fizer sentido, sem perder a precisão. Seja carismático, mas técnico.
 
@@ -129,7 +138,19 @@ class AIService:
 
     async def analyze_match(self, match_notification: MatchNotification):
         logging.info(f"Analisando partida com {self.provider}...")
-        prompt = self.generate_analysis_prompt(match_notification)
+        
+        # BUSCA DE PADRÕES (TREINAMENTO POR CONTEXTO)
+        historical_text = ""
+        try:
+            winners = self.seeker.get_winning_patterns(limit=5)
+            if winners:
+                historical_text = "Abaixo estão exemplos de partidas REAIS do seu banco que deram GREEN. Use-os como base de comparação:\n"
+                for w in winners:
+                    historical_text += f"- Partida: {w['teams']} (Resultado: {w['result']}). Padrões: {w['patterns']}\n"
+        except Exception as e:
+            logging.warning(f"Falha ao carregar padrões para análise: {e}")
+
+        prompt = self.generate_analysis_prompt(match_notification, historical_text)
 
         try:
             content = ""
@@ -148,7 +169,6 @@ class AIService:
                 content = response.choices[0].message.content
 
             # --- Lógica de Filtro e Registro de Predição ---
-            import re
             # Detectar eventos internos (cartão/gol) nas tabelas para filtro adicional
             has_blocking_event = False
             try:
